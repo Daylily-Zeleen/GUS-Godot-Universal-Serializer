@@ -1,5 +1,5 @@
 
-# GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.01
+# GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.02
 
 ![Image text](https://github.com/Daylily-Zeleen/GUS-Godot-Universal-Serializer/blob/main/icon.png)
 
@@ -36,4 +36,8 @@
 		c、添加使用方法说明
 		d、添加公用方法和测试方法的说明
 		e、优化反序列化时 push_error() 的打印信息
+	2022-1-19 :忘忧の - 735170336@qq.com - v1.02
+		a、修复反序列化空数组错误
+		b、修复反序列化空字典错误
+		c、优化空池化数组的序列化长度
 
