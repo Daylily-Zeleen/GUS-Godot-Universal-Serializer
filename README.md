@@ -1,6 +1,8 @@
 
 # GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.01
 
+![Image text](https://github.com/Daylily-Zeleen/GUS-Godot-Universal-Serializer/blob/main/icon.png)
+
 支持 Godot 3.x 中除了 Object 和 RID 以外的所有数据类型。
 主要用于简单场合的跨端传输数据时代替json使用。
 
