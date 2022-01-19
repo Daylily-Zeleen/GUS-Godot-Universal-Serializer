@@ -1,5 +1,5 @@
 """
-	GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.01
+	GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.02
 	
 	支持 Godot 3.x 中除了 Object 和 RID 以外的所有数据类型。
 	主要用于简单场合的跨端传输数据时代替json使用。
@@ -35,6 +35,10 @@
 			c、添加使用方法说明
 			d、添加公用方法和测试方法的说明
 			e、优化反序列化时 push_error() 的打印信息
+		2022-1-19 :忘忧の - 735170336@qq.com - v1.02
+			a、修复反序列化空数组错误
+			b、修复反序列化空字典错误
+			c、优化空池化数组的序列化长度
 """
 class_name GUS
 
@@ -214,23 +218,34 @@ enum {
 	TRANSFORM,
 	COLOR,
 	NODE_PATH,
-	DICT,
-	ARR,
+	DICT_BEGIN, 
+	DICT_END,
+	ARR_BEGIN, 
+	ARR_END, 
 	# 池化数组元素个数不超过 2^32（Godot自身限定
 	RAW_ARR,
 	INT32_ARR, 
 	FLOAT32_ARR,
-	STR_ARR,
 	VEC2_ARR,
+	STR_ARR,
 	VEC3_ARR,
 	COLOR_ARR,
+	EMPTY_DICT,
+	EMP_ARR,
+	EMPTY_RAW_ARR,
+	EMPTY_INT32_ARR, 
+	EMPTY_FLOAT32_ARR,
+	EMPTY_STR_ARR,
+	EMPTY_VEC2_ARR,
+	EMPTY_VEC3_ARR
+	EMPTY_COLOR_ARR,
 }
 
 
 static func _put_var(v,buffer:StreamPeerBuffer)->bool:
 	match typeof(v):
-		TYPE_NIL: buffer.put_8(NULL)
-		TYPE_BOOL: buffer.put_8(TRUE if v else FALSE)
+		TYPE_NIL: buffer.put_u8(NULL)
+		TYPE_BOOL: buffer.put_u8(TRUE if v else FALSE)
 		TYPE_INT: _put_int(v,buffer)
 		TYPE_REAL: _put_real(v,buffer)
 		TYPE_STRING: _put_str(v,buffer)
@@ -260,7 +275,7 @@ static func _put_var(v,buffer:StreamPeerBuffer)->bool:
 	return true
 
 static func _get_var(buffer:StreamPeerBuffer):
-	var code:=buffer.get_8()
+	var code:=buffer.get_u8()
 	match code:
 		NULL: return null
 		TRUE: return true
@@ -343,26 +358,34 @@ static func _get_var(buffer:StreamPeerBuffer):
 				push_error("Illegal data stream, can not convert to Color.")
 				return Color()
 		NODE_PATH: return NodePath(_get_str(buffer))
-		DICT:
+		DICT_BEGIN:
 			var r:={}
-			while buffer.get_available_bytes()>3:
+			while buffer.get_available_bytes()>0:
+				if buffer.data_array[buffer.get_position()] == DICT_END:
+					buffer.get_u8()
+					return r
 				var k = _get_var(buffer)
 				r[k] = _get_var(buffer)
-				if buffer.data_array[buffer.get_position()] == DICT :
-					return r
 			push_error("Illegal data stream, can not convert to Dictionary.")
 			return {}
-		ARR:
+		ARR_BEGIN:
 			var r:=[]
-			while buffer.get_available_bytes()>1:
-				r.append(_get_var(buffer))
-				if buffer.data_array[buffer.get_position()] == ARR:
-					buffer.get_8()
+			while buffer.get_available_bytes()>0:
+				if buffer.data_array[buffer.get_position()] == ARR_END:
+					buffer.get_u8()
 					return r
+				r.append(_get_var(buffer))
 			push_error("Illegal data stream, can not convert to Array.")
 			return []
+		INT_1,INT_2,INT_3,INT_4,INT_5,INT_6,INT_7,INT_8: return _get_int(buffer,code)
+		FLOAT_TEXT_1,FLOAT_TEXT_2,FLOAT_TEXT_3: _get_float_from_ascii(buffer,code-INT_8)
+		FLOAT_4: return buffer.get_float()
+		FLOAT_TEXT_5,FLOAT_TEXT_6,FLOAT_TEXT_7: _get_float_from_ascii(buffer,code-INT_8)
+		FLOAT_8: return buffer.get_double()
+		EMP_ARR: return []
+		EMPTY_DICT: return []
 		RAW_ARR:
-			var int_code:= buffer.get_8()
+			var int_code:= buffer.get_u8()
 			var size:=_get_int(buffer,int_code)
 			if buffer.get_available_bytes()>=size:
 				var tmp := buffer.get_data(size)
@@ -375,7 +398,7 @@ static func _get_var(buffer:StreamPeerBuffer):
 				push_error("Illegal data stream, can not convert to PoolByteArray.")
 				return PoolByteArray()
 		INT32_ARR:
-			var int_code:= buffer.get_8()
+			var int_code:= buffer.get_u8()
 			var size:=_get_int(buffer,int_code)
 			if buffer.get_available_bytes()>=size*4:
 				var r := PoolIntArray()
@@ -387,7 +410,7 @@ static func _get_var(buffer:StreamPeerBuffer):
 				push_error("Illegal data stream, can not convert to PoolIntArray.")
 				return PoolIntArray()
 		FLOAT32_ARR:
-			var int_code:= buffer.get_8()
+			var int_code:= buffer.get_u8()
 			var size:=_get_int(buffer,int_code)
 			if buffer.get_available_bytes()>=size*4:
 				var r := PoolRealArray()
@@ -400,15 +423,15 @@ static func _get_var(buffer:StreamPeerBuffer):
 				return PoolRealArray()
 		STR_ARR:
 			var r:=PoolStringArray()
-			while buffer.get_available_bytes()>0:
+			while buffer.get_available_bytes()>1:
 				r.push_back(_get_str(buffer))
 				if buffer.data_array[buffer.get_position()] == STR_ARR:
-					buffer.get_8()
+					buffer.get_u8()
 					return r
 			push_error("Illegal data stream, can not convert to PoolStringArray.")
 			return PoolStringArray()
 		VEC2_ARR:
-			var int_code:= buffer.get_8()
+			var int_code:= buffer.get_u8()
 			var size:=_get_int(buffer,int_code)
 			if buffer.get_available_bytes()>=size*8:
 				var r := PoolVector2Array()
@@ -420,7 +443,7 @@ static func _get_var(buffer:StreamPeerBuffer):
 				push_error("Illegal data stream, can not convert to PoolVector2Array.")
 				return PoolVector2Array()
 		VEC3_ARR:
-			var int_code:= buffer.get_8()
+			var int_code:= buffer.get_u8()
 			var size:=_get_int(buffer,int_code)
 			if buffer.get_available_bytes()>=size*12:
 				var r := PoolVector3Array()
@@ -432,7 +455,7 @@ static func _get_var(buffer:StreamPeerBuffer):
 				push_error("Illegal data stream, can not convert to PoolVector3Array.")
 				return PoolVector3Array()
 		COLOR_ARR:
-			var int_code:= buffer.get_8()
+			var int_code:= buffer.get_u8()
 			var size:=_get_int(buffer,int_code)
 			if buffer.get_available_bytes()>=size*4:
 				var r := PoolColorArray()
@@ -443,15 +466,16 @@ static func _get_var(buffer:StreamPeerBuffer):
 			else:
 				push_error("Illegal data stream, can not convert to PoolColorArray.")
 				return PoolColorArray()
+		EMPTY_RAW_ARR: return PoolByteArray()
+		EMPTY_INT32_ARR: return PoolIntArray()
+		EMPTY_FLOAT32_ARR: return PoolRealArray()
+		EMPTY_STR_ARR: return PoolStringArray()
+		EMPTY_VEC2_ARR: return PoolVector2Array()
+		EMPTY_VEC3_ARR : return PoolVector3Array()
+		EMPTY_COLOR_ARR: return PoolColorArray()
 		_:
-			if code > FALSE and code <= INT_8: 
-				return _get_int(buffer,code)
-			elif code == FLOAT_4: return buffer.get_float()
-			elif code>INT_8 and code < FLOAT_8: return _get_float_from_ascii(buffer,code-INT_8)
-			elif code == FLOAT_8: return buffer.get_double()
-			else:
-				push_error("Unrecognized code:%d"%code)
-				return null
+			push_error("Unrecognized code:%d"%code)
+			return null
 	
 # 序列化反序列化
 static func _put_int(v:int,buffer:StreamPeerBuffer)->void:#->PoolByteArray:
@@ -467,7 +491,7 @@ static func _put_int(v:int,buffer:StreamPeerBuffer)->void:#->PoolByteArray:
 			if bs[i] != 0:break
 			i-=1
 		if bs[i]&0b10000000!=0: i+=1 # 最高位表示负数
-	buffer.put_8(INT_1 + i)
+	buffer.put_u8(INT_1 + i)
 	buffer.put_data(bs.subarray(0,i))
 
 static func _get_int(buffer:StreamPeerBuffer,size_code:int)->int:
@@ -521,21 +545,21 @@ static func __get_int64(buffer:StreamPeerBuffer,byte_count:int )->int:
 static func _put_real(v:float, buffer:StreamPeerBuffer)->void:
 	var text:= str(v)
 	if text.length() < 4:
-		buffer.put_8(INT_8 + text.length())
+		buffer.put_u8(INT_8 + text.length())
 		buffer.put_data(text.to_ascii())
 	else:
 		if ONLY_FLOAT32:
-			buffer.put_8(FLOAT_4)
+			buffer.put_u8(FLOAT_4)
 			buffer.put_float(v)
 		else:
 			if var2bytes(v).size() == 8:
-				buffer.put_8(FLOAT_4)
+				buffer.put_u8(FLOAT_4)
 				buffer.put_float(v)
 			elif text.length() < 8:
-				buffer.put_8(INT_8 + text.length())
+				buffer.put_u8(INT_8 + text.length())
 				buffer.put_data(text.to_ascii())
 			else:
-				buffer.put_8(FLOAT_8)
+				buffer.put_u8(FLOAT_8)
 				buffer.put_double(v)
 
 static func _get_float_from_ascii(buffer:StreamPeerBuffer, byte_count:int )->float:
@@ -551,9 +575,9 @@ static func _get_float_from_ascii(buffer:StreamPeerBuffer, byte_count:int )->flo
 			return 0.0
 
 static func _put_str(v:String, buffer:StreamPeerBuffer)->void:
-	buffer.put_8(STR)
+	buffer.put_u8(STR)
 	buffer.put_data(v.to_utf8() if UTF8_STR else v.to_ascii())
-	buffer.put_8(STR)
+	buffer.put_u8(STR)
 
 static func _get_str(buffer:StreamPeerBuffer)->String: 
 	var pos:= buffer.get_position()
@@ -562,7 +586,7 @@ static func _get_str(buffer:StreamPeerBuffer)->String:
 	while idx < buffer.data_array.size():
 		if buffer.data_array[idx] == STR:
 			var tmp := buffer.get_data(size)
-			buffer.get_8()
+			buffer.get_u8()
 			if tmp[0] == OK:
 				if UTF8_STR:
 					return PoolByteArray(tmp[1]).get_string_from_utf8()
@@ -577,25 +601,25 @@ static func _get_str(buffer:StreamPeerBuffer)->String:
 	return ""
 
 static func _put_vec2(v:Vector2,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(VECTOR2)
+	buffer.put_u8(VECTOR2)
 	buffer.put_float(v.x)
 	buffer.put_float(v.y)
 	
 static func _put_rect2(v:Rect2,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(RECT2)
+	buffer.put_u8(RECT2)
 	buffer.put_float(v.position.x)
 	buffer.put_float(v.position.y)
 	buffer.put_float(v.size.x)
 	buffer.put_float(v.size.y)
 
 static func _put_vec3(v:Vector3,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(VECTOR3)
+	buffer.put_u8(VECTOR3)
 	buffer.put_float(v.x)
 	buffer.put_float(v.y)
 	buffer.put_float(v.z)
 	
 static func _put_transform2d(v:Transform2D,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(TRANSFORM2D)
+	buffer.put_u8(TRANSFORM2D)
 	buffer.put_float(v.x.x)
 	buffer.put_float(v.x.y)
 	buffer.put_float(v.y.x)
@@ -604,21 +628,21 @@ static func _put_transform2d(v:Transform2D,buffer:StreamPeerBuffer)->void:
 	buffer.put_float(v.origin.y)
 	
 static func _put_plane(v:Plane,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(PLANE)
+	buffer.put_u8(PLANE)
 	buffer.put_float(v.x)
 	buffer.put_float(v.y)
 	buffer.put_float(v.z)
 	buffer.put_float(v.d)
 	
 static func _put_quat(v:Quat,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(QUAT)
+	buffer.put_u8(QUAT)
 	buffer.put_float(v.x)
 	buffer.put_float(v.y)
 	buffer.put_float(v.z)
 	buffer.put_float(v.w)
 	
 static func _put_aabb(v:AABB,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(AABB_)
+	buffer.put_u8(AABB_)
 	buffer.put_float(v.position.x)
 	buffer.put_float(v.position.y)
 	buffer.put_float(v.position.z)
@@ -627,7 +651,7 @@ static func _put_aabb(v:AABB,buffer:StreamPeerBuffer)->void:
 	buffer.put_float(v.size.z)
 	
 static func _put_basis(v:Basis,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(BASIS)
+	buffer.put_u8(BASIS)
 	buffer.put_float(v.x.x)
 	buffer.put_float(v.x.y)
 	buffer.put_float(v.x.z)
@@ -639,7 +663,7 @@ static func _put_basis(v:Basis,buffer:StreamPeerBuffer)->void:
 	buffer.put_float(v.z.z)
 
 static func _put_transform(v:Transform,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(TRANSFORM)
+	buffer.put_u8(TRANSFORM)
 	buffer.put_float(v.basis.x.x)
 	buffer.put_float(v.basis.x.y)
 	buffer.put_float(v.basis.x.z)
@@ -654,67 +678,85 @@ static func _put_transform(v:Transform,buffer:StreamPeerBuffer)->void:
 	buffer.put_float(v.origin.z)
 	
 static func _put_color(v:Color,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(COLOR)
+	buffer.put_u8(COLOR)
 	buffer.put_32(v.to_rgba32())
 	
 static func _put_node_path(v:NodePath,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(NODE_PATH)
+	buffer.put_u8(NODE_PATH)
 	buffer.put_data(str(v).to_utf8() if UTF8_STR else str(v).to_ascii())
-	buffer.put_8(STR)
+	buffer.put_u8(STR)
 	
 static func _put_arr(v:Array,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(ARR)
-	for e in v:
-		_put_var(e, buffer)
-	buffer.put_8(ARR)
-
+	if v.size():
+		buffer.put_u8(ARR_BEGIN)
+		for e in v:
+			_put_var(e, buffer)
+		buffer.put_u8(ARR_END)
+	else: buffer.put_u8(EMP_ARR)
+	
 static func _put_raw_arr(v:PoolByteArray,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(RAW_ARR)
-	_put_int(v.size(),buffer)
-	buffer.put_data(v)
+	if v.size():
+		buffer.put_u8(RAW_ARR)
+		_put_int(v.size(),buffer)
+		buffer.put_data(v)
+	else: buffer.put_u8(EMPTY_RAW_ARR)
 
 static func _put_int32_arr(v:PoolIntArray,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(INT32_ARR)
-	_put_int(v.size(),buffer)
-	for e in v:
-		buffer.put_32(e)
-
+	if v.size():
+		buffer.put_u8(INT32_ARR)
+		_put_int(v.size(),buffer)
+		for e in v:
+			buffer.put_32(e)
+	else: buffer.put_u8(EMPTY_INT32_ARR)
+	
 static func _put_float_arr(v:PoolRealArray,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(FLOAT32_ARR)
-	_put_int(v.size(),buffer)
-	for e in v: buffer.put_float(e)
+	if v.size():
+		buffer.put_u8(FLOAT32_ARR)
+		_put_int(v.size(),buffer)
+		for e in v: buffer.put_float(e)
+	else: buffer.put_u8(EMPTY_FLOAT32_ARR)
 	
 static func _put_str_arr(v:PoolStringArray,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(STR_ARR)
-	for e in v: 
-		buffer.put_data(e.to_utf8() if UTF8_STR else e.to_ascii())
-		buffer.put_8(STR)
-	buffer.put_8(STR_ARR)
+	if v.size():
+		buffer.put_u8(STR_ARR)
+		for e in v: 
+			buffer.put_data(e.to_utf8() if UTF8_STR else e.to_ascii())
+			buffer.put_u8(STR)
+		buffer.put_u8(STR_ARR)
+	else : buffer.put_u8(EMPTY_STR_ARR)
 
 static func _put_vec2_arr(v:PoolVector2Array,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(VEC2_ARR)
-	_put_int(v.size(),buffer)
-	for e in v:
-		buffer.put_float(e.x)
-		buffer.put_float(e.y)
+	if v.size():
+		buffer.put_u8(VEC2_ARR)
+		_put_int(v.size(),buffer)
+		for e in v:
+			buffer.put_float(e.x)
+			buffer.put_float(e.y)
+	else: buffer.put_u8(EMPTY_VEC2_ARR)
 	
 static func _put_vec3_arr(v:PoolVector3Array,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(VEC3_ARR)
-	_put_int(v.size(),buffer)
-	for e in v:
-		buffer.put_float(e.x)
-		buffer.put_float(e.y)
-		buffer.put_float(e.z)
-
+	if v.size():
+		buffer.put_u8(VEC3_ARR)
+		_put_int(v.size(),buffer)
+		for e in v:
+			buffer.put_float(e.x)
+			buffer.put_float(e.y)
+			buffer.put_float(e.z)
+	else: buffer.put_u8(EMPTY_VEC3_ARR)
+	
 static func _put_color_arr(v:PoolColorArray,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(COLOR_ARR)
-	_put_int(v.size(),buffer)
-	for e in v:
-		buffer.put_32((e as Color).to_rgba32())
-
+	if v.size():
+		buffer.put_u8(COLOR_ARR)
+		_put_int(v.size(),buffer)
+		for e in v:
+			buffer.put_32((e as Color).to_rgba32())
+	else: buffer.put_u8(EMPTY_COLOR_ARR)
+		
 static func _put_dict(v:Dictionary,buffer:StreamPeerBuffer)->void:
-	buffer.put_8(DICT)
-	for k in v:
-		_put_var(k,buffer)
-		_put_var(v[k],buffer)
-	buffer.put_8(DICT)
+	if v.size():
+		buffer.put_u8(DICT_BEGIN)
+		for k in v:
+			_put_var(k,buffer)
+			_put_var(v[k],buffer)
+		buffer.put_u8(DICT_END)
+	else: buffer.put_u8(EMPTY_DICT)
