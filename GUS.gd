@@ -1,5 +1,5 @@
 """
-	GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.02
+	GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.03
 	
 	支持 Godot 3.x 中除了 Object 和 RID 以外的所有数据类型。
 	主要用于简单场合的跨端传输数据时代替json使用。
@@ -28,17 +28,22 @@
 		2、编写为cpp插件以解决大数组序列化效率低下的问题
 	
 	编辑历史：
-		2022-1-18 :忘忧の - 735170336@qq.com - v1.0
+		2022-1-21 ：忘忧の - 735170336@七qq.com - v1.03
+			为了方便在特定场合通过字符串设置 GUS 默认值，做出以下修改：
+				a、修改并新增 bool 的识别代码
+				b、修改字典，数组的识别代码
+			例如: 数据库中 存储GUS编码的二进制字段 的默认值,可以字符串'[]','{}','T'或't','F'或'f'设置默认值,分别为 空数组， 空字典, 布尔值 真，布尔值 假
+		2022-1-19 :忘忧の - 735170336@qq.com - v1.02
+			a、修复反序列化空数组错误
+			b、修复反序列化空字典错误
+			c、优化空池化数组的序列化长度
 		2022-1-19 :忘忧の - 735170336@qq.com - v1.01
 			a、为序列化方法添加类型检测断言以便于调试
 			b、为_test()添加 null, bool 两种测试
 			c、添加使用方法说明
 			d、添加公用方法和测试方法的说明
 			e、优化反序列化时 push_error() 的打印信息
-		2022-1-19 :忘忧の - 735170336@qq.com - v1.02
-			a、修复反序列化空数组错误
-			b、修复反序列化空字典错误
-			c、优化空池化数组的序列化长度
+		2022-1-18 :忘忧の - 735170336@qq.com - v1.0
 """
 class_name GUS
 
@@ -188,9 +193,7 @@ func _print_result(title_name:String, v)->void:
 ############
 enum {
 	STR,
-	NULL,	
-	TRUE,
-	FALSE,
+	NULL,
 	INT_1,
 	INT_2,
 	INT_3,
@@ -213,15 +216,11 @@ enum {
 	TRANSFORM2D,
 	PLANE,
 	QUAT,
-	AABB_,
+	AABB_, # 与 AABB 重名，故加下划线
 	BASIS,
 	TRANSFORM,
 	COLOR,
 	NODE_PATH,
-	DICT_BEGIN, 
-	DICT_END,
-	ARR_BEGIN, 
-	ARR_END, 
 	# 池化数组元素个数不超过 2^32（Godot自身限定
 	RAW_ARR,
 	INT32_ARR, 
@@ -230,6 +229,7 @@ enum {
 	STR_ARR,
 	VEC3_ARR,
 	COLOR_ARR,
+	# 为序列化长度优化设置的空对象识别编号
 	EMPTY_DICT,
 	EMP_ARR,
 	EMPTY_RAW_ARR,
@@ -239,13 +239,22 @@ enum {
 	EMPTY_VEC2_ARR,
 	EMPTY_VEC3_ARR
 	EMPTY_COLOR_ARR,
+	# 常用字符,通过字符串进行编码，方便在一些场合设置默认值（例如将 GUS 序列化后的二进制字符串存储在数据库时，通过字符串为该字段设置默认值）
+	FALSE_CAP=70, # ‘F’
+	TRUE_CAP=84, # 'T'
+	ARR_BEGIN = 91, # ‘【’
+	ARR_END = 93,  # ‘】’
+	FALSE_LOW=102, # ‘f’
+	TRUE_LOW=116, # 't'
+	DICT_BEGIN = 123, # '{'
+	DICT_END = 125, # '}'
 }
 
 
 static func _put_var(v,buffer:StreamPeerBuffer)->bool:
 	match typeof(v):
 		TYPE_NIL: buffer.put_u8(NULL)
-		TYPE_BOOL: buffer.put_u8(TRUE if v else FALSE)
+		TYPE_BOOL: buffer.put_u8(TRUE_CAP if v else FALSE_CAP)
 		TYPE_INT: _put_int(v,buffer)
 		TYPE_REAL: _put_real(v,buffer)
 		TYPE_STRING: _put_str(v,buffer)
@@ -278,8 +287,8 @@ static func _get_var(buffer:StreamPeerBuffer):
 	var code:=buffer.get_u8()
 	match code:
 		NULL: return null
-		TRUE: return true
-		FALSE: return false
+		FALSE_CAP,FALSE_LOW: return false
+		TRUE_CAP,TRUE_LOW: return true
 		STR: return _get_str(buffer)
 		VECTOR2: 
 			if buffer.get_available_bytes() >=8:
@@ -498,7 +507,7 @@ static func _get_int(buffer:StreamPeerBuffer,size_code:int)->int:
 	if size_code == INT_4: return buffer.get_32()
 	elif size_code == INT_8: return buffer.get_64()
 	else:
-		var count:= size_code-FALSE
+		var count:= size_code-NULL
 		if count<4: return __get_int32(buffer,count)
 		else: return __get_int64(buffer,count)
 
