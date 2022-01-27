@@ -5,7 +5,7 @@
 
 [中文文档](https://github.com/Daylily-Zeleen/GUS-Godot-Universal-Serializer/blob/main/README_zh_cn.md) <- 点击这里。
 
-A Godot's universal serializer for size optimization.
+A Godot's universal serializer for size optimization.    
 Support all data types except Object and RID in Godot 3.x.
 
 # Feature:
