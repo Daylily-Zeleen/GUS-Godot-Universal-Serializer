@@ -2,6 +2,7 @@
 # GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.03
 
 ![Image text](https://github.com/Daylily-Zeleen/GUS-Godot-Universal-Serializer/blob/main/icon.png)
+[English readme](https://github.com/Daylily-Zeleen/GUS-Godot-Universal-Serializer/blob/main/README.md) <- Click here.
 
 以序列化后体积优化为目标的Godot 3.x通用序列化器。  
 支持 Godot 3.x 中除了 Object 和 RID 以外的所有数据类型。  
