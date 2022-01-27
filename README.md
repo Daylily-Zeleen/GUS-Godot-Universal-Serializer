@@ -3,46 +3,53 @@
 
 ![Image text](https://github.com/Daylily-Zeleen/GUS-Godot-Universal-Serializer/blob/main/icon.png)
 
-支持 Godot 3.x 中除了 Object 和 RID 以外的所有数据类型。
-主要用于简单场合的跨端传输数据时代替json使用。
+[中文文档](https://github.com/Daylily-Zeleen/GUS-Godot-Universal-Serializer/blob/main/README_zh_cn.md) <- 点击这里。
 
-# 特性:
-	1、不丢失类型信息，跨端传送 无需 类型检测 与 强制类型转换，如同本地传参一般。
-	2、int与float是可变长序列化。
-	3、序列化后的数据大小小于 Json 和 原生序列化方法(var2bytes())，尤其适合多人游戏中要传送的结构化小数据序列化。
-	可调用 _test() 查看3种方式的序列化后数据大小对比
+A Godot's universal serializer for size optimization.
+Support all data types except Object and RID in Godot 3.x.
 
-# 使用方法:
-	1、按需求修改脚本开头的几个配置定义常量
-	2、将不含有 Object 和 RID 的变量传入 GUS.to_bytes() 获取序列化后的数据,并通过任意 网络对等体 发送给远端。
-	3、远端的网络对等体接收到数据后获取序列化后的数据， 传入 GUS.to_var() 即可得到与序列化之前相同的 变量。
+# Feature:
+	1. Without losing type information. Need not type detection and
+	forced typce conversion in Cross end transfer，just like local parameter transfer.
 
-	附加：可将获取到的序列化数据 传入 GUS.get_pretty_json_text() 获取经美化后的json文本进行打印显示方便调试。
+	2. Integer and float are variable length serialization.
 
-# 注意事项：
-	1、跨端应用的 配置定义 应保持相同。
-	2、Array 与 Dictionary 中不应含有 Object 或 RID。
-	3、虽然序列化后的数据尺寸较优，但是由于是脚本实现，效率低下，大数组的序列化和反序列化的时间很长，应该避免在即时性敏感的场合序列化和反序列大数组。
+	3. The serialized data size is smaller than JSON text to utf8 and the native serialization method (var2bytes ()).GUS is especially suitable for the serialization of structured small dat transfer in multiplayer games.You can call GUS._test() to view the data size comparison after serialization in these three way.
 
+# How to use:
+	1. Modify the configuration definition constants at the beginning of the script as required.
+	2. Pass variable which without Object and Eid into GUS.to_bytes() and gets the serialized data for sending through any network peer.
+	3. After the remote network peer obtains the serialized data, passe it into GUS.to_var () to get the same variable as before serialization.
+	
+	Additional: The obtained serialized data can be passed into GUS.get_ pretty_ json_text(), a beautified JSON text will be return, which is for printing and display when debugging.
+
+
+# Be careful:
+	1. The configuration definitions of cross end applications should keep the same.
+	2. Array and Dictionary should not contain Object or RID.
+	3. Because of implementing by GDScript, although the serialized data size is better, it will cost lot of time when serialization and deserialization large array(both Array and PoolArray), you should avoid to use GUS in time sensitive case.
+	
 # TODO:
-	1、编写 Godot4.x 适用的 GUS 2.0。
-	2、编写为cpp插件以解决大数组序列化效率低下的问题。
+	1. Write GUS 2.0 applicable for godot4 X .
+	2. Write as C++ addons to solve the problem of low efficiency of large array serialization.
 
-# 编辑历史：		
-	2022-1-21 ：忘忧の - 735170336@七qq.com - v1.03
-		为了方便在特定场合通过字符串设置 GUS 默认值，做出以下修改：
-			a、修改并新增 bool 的识别代码
-			b、修改字典，数组的识别代码
-		例如: 数据库中 存储GUS编码的二进制字段 的默认值,可以字符串'[]','{}','T'或't','F'或'f'设置默认值,分别为 空数组， 空字典, 布尔值 真，布尔值 假
-	2022-1-19 :忘忧の - 735170336@qq.com - v1.02
-		a、修复反序列化空数组错误
-		b、修复反序列化空字典错误
-		c、优化空池化数组的序列化长度	
-	2022-1-19 :忘忧の - 735170336@qq.com - v1.01
-		a、为序列化方法添加类型检测断言以便于调试
-		b、为_test()添加 null, bool 两种测试
-		c、添加使用方法说明
-		d、添加公用方法和测试方法的说明
-		e、优化反序列化时 push_error() 的打印信息
-	2022-1-18 :忘忧の - 735170336@qq.com - v1.0
+# Edit history:
+	January 21, 2022: Daylily-Zeleen - 735170336@qq.com - v1. 03
+	In order to setting default value by string facilitatly in some special specific occasions, I made some change as below:
+	a、Modify and add identification code for Boolean.
+	b、Modify identification code for Boolean Array and Dictionary.
+	For example, the default values of GUS encoded binary fields which stored in the database can be set as '[]', '{}', 'T' or 't', 'F' or 'f', which mean that empty Array, empty Dictionary, True and False .
 
+	January 19, 2022: Daylily-Zeleen - 735170336@qq.com - v1. 02
+	a、Fix empty Array deserialize error.
+	b、Fix empty Dictionary deserialize error.
+	c、Optimize empty pool arrays serialized size.
+
+	January 19, 2022: Daylily-Zeleen - 735170336@qq.com - v1. 01
+	a. Add type detection assert to GUS.to_bytes() for debugging purposes.
+	b. Add 'null' and 'bool' into GUS._test().
+	c. Add "How to use".
+	d. Add descriptions of common methods and test methods.
+	e. Optimize the text for push_error() when deserialize(GUS.to_var()) faild.
+
+	January 18, 2022: Daylily-Zeleen - 735170336@qq.com - v1. 0
