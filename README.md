@@ -31,8 +31,10 @@ Support all data types except Object and RID in Godot 3.x.
   2. Write as C++ addons to solve the problem of low efficiency of large array serialization.
 
 # Edit history:
-  - January 21, 2022: Daylily-Zeleen - 735170336@qq.com - v1. 03:
-    
+  - January 21, 2022: Daylily-Zeleen - 735170336@qq.com - v1. 03:    
+	Fix empty Dictionary deserialize error.
+	
+  - January 21, 2022: Daylily-Zeleen - 735170336@qq.com - v1. 03:    
     In order to setting default value by string facilitatly in some special specific occasions, I made some change as below: 
   
 	  1. Modify and add identification code for Boolean.  
