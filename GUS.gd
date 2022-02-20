@@ -1,5 +1,5 @@
 """
-	GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.03
+	GUS - Godot Universal Serializer - Godot的通用序列化器 - V1.04
 	
 	支持 Godot 3.x 中除了 Object 和 RID 以外的所有数据类型。
 	主要用于简单场合的跨端传输数据时代替json使用。
@@ -28,21 +28,26 @@
 		2、编写为cpp插件以解决大数组序列化效率低下的问题
 	
 	编辑历史：
-		2022-1-21 ：忘忧の - 735170336@七qq.com - v1.03
+		2022-2-20 ：忘忧の - 735170336@qq.com - v1.04
+			修复空字典识别错误
+		2022-1-21 ：忘忧の - 735170336@qq.com - v1.03
 			为了方便在特定场合通过字符串设置 GUS 默认值，做出以下修改：
 				a、修改并新增 bool 的识别代码
 				b、修改字典，数组的识别代码
 			例如: 数据库中 存储GUS编码的二进制字段 的默认值,可以字符串'[]','{}','T'或't','F'或'f'设置默认值,分别为 空数组， 空字典, 布尔值 真，布尔值 假
+		
 		2022-1-19 :忘忧の - 735170336@qq.com - v1.02
 			a、修复反序列化空数组错误
 			b、修复反序列化空字典错误
 			c、优化空池化数组的序列化长度
+			
 		2022-1-19 :忘忧の - 735170336@qq.com - v1.01
 			a、为序列化方法添加类型检测断言以便于调试
 			b、为_test()添加 null, bool 两种测试
 			c、添加使用方法说明
 			d、添加公用方法和测试方法的说明
 			e、优化反序列化时 push_error() 的打印信息
+			
 		2022-1-18 :忘忧の - 735170336@qq.com - v1.0
 """
 class_name GUS
@@ -392,7 +397,7 @@ static func _get_var(buffer:StreamPeerBuffer):
 		FLOAT_TEXT_5,FLOAT_TEXT_6,FLOAT_TEXT_7: _get_float_from_ascii(buffer,code-INT_8)
 		FLOAT_8: return buffer.get_double()
 		EMP_ARR: return []
-		EMPTY_DICT: return []
+		EMPTY_DICT: return {}
 		RAW_ARR:
 			var int_code:= buffer.get_u8()
 			var size:=_get_int(buffer,int_code)
