@@ -30,6 +30,7 @@
 	编辑历史：
 		2022-2-20 ：忘忧の - 735170336@qq.com - v1.04
 			修复空字典识别错误
+
 		2022-1-21 ：忘忧の - 735170336@qq.com - v1.03
 			为了方便在特定场合通过字符串设置 GUS 默认值，做出以下修改：
 				a、修改并新增 bool 的识别代码
@@ -50,6 +51,8 @@
 			
 		2022-1-18 :忘忧の - 735170336@qq.com - v1.0
 """
+tool
+extends EditorScript
 class_name GUS
 
 # 配置定义
@@ -83,7 +86,8 @@ static func to_var(data:PoolByteArray):
 static func get_pretty_json_text(data:PoolByteArray,pretty_indent:="\t")->String:
 	return JSON.print(data,pretty_indent)
 
-
+func _run() -> void:
+	_test(get_editor_interface())
 
 # 简单的序列化测试
 # inside_tree_node : 场景树中的任意节点（如果传入的节点不在场景树中，将会因为打印溢出而无法显示完整结果
@@ -392,9 +396,9 @@ static func _get_var(buffer:StreamPeerBuffer):
 			push_error("Illegal data stream, can not convert to Array.")
 			return []
 		INT_1,INT_2,INT_3,INT_4,INT_5,INT_6,INT_7,INT_8: return _get_int(buffer,code)
-		FLOAT_TEXT_1,FLOAT_TEXT_2,FLOAT_TEXT_3: _get_float_from_ascii(buffer,code-INT_8)
+		FLOAT_TEXT_1,FLOAT_TEXT_2,FLOAT_TEXT_3: return _get_float_from_ascii(buffer,code-INT_8)
 		FLOAT_4: return buffer.get_float()
-		FLOAT_TEXT_5,FLOAT_TEXT_6,FLOAT_TEXT_7: _get_float_from_ascii(buffer,code-INT_8)
+		FLOAT_TEXT_5,FLOAT_TEXT_6,FLOAT_TEXT_7: return _get_float_from_ascii(buffer,code-INT_8)
 		FLOAT_8: return buffer.get_double()
 		EMP_ARR: return []
 		EMPTY_DICT: return {}
